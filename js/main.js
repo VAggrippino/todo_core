@@ -15,17 +15,23 @@ window.addEventListener('load', () => {
 
             list_block.appendChild(list_heading)
 
-            // Add the items for this list to the list block or "No items found" if there aren't any
+            // Create an array from provided list items (empty if not provided)
             const list_items = params.get(`l${list_number}items`)
-            const list_values = params.get(`l${list_number}values`)
-            if (list_items !== null) {
-                const list_values_array = (function () {
-                    if (list_values === null) return null
-                    return list_values.split(',')
-                })()
+            const list_items_array = (function () {
+                if (list_items !== null) return list_items.split(',')
+                return []
+            })()
 
+            // Create an array from provided list item checkbox values (empty if not provided)
+            const list_checks = params.get(`l${list_number}checks`)
+            const list_checks_array = (function () {
+                if (list_checks !== null) return list_checks.split('')
+                return Array(list_items_array.length).fill(0)
+            })()
+
+            if (list_items_array.length > 0) {
                 const list = document.createElement('ul')
-                const items = list_items.split(',').map((item_text, index) => {
+                const items = list_items_array.map((item_text, index) => {
                     const item = document.createElement('li')
 
                     const checkbox = document.createElement('input')
@@ -34,7 +40,7 @@ window.addEventListener('load', () => {
                     checkbox.setAttribute('id', `l${list_number}-${index}`)
                     checkbox.setAttribute('value', item_text)
                     
-                    if (list_values_array[index] === '1') {
+                    if (list_checks_array[index] === '1') {
                         checkbox.setAttribute('checked', true)
                     }
 

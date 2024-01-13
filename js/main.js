@@ -31,7 +31,8 @@ window.addEventListener('load', () => {
         list_block.setAttribute('id', 'l' + list_index)
         list_container.appendChild(list_block)
 
-        const list_heading = tc.querySelector('.list__heading').cloneNode(true)
+        const list_heading = tc.querySelector('.list__heading').cloneNode()
+        list_heading.innerText = list_name.name
         list_block.appendChild(list_heading)
 
         const list_ul = tc.querySelector('.list ul').cloneNode()

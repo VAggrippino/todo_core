@@ -7,25 +7,16 @@ window.addEventListener('load', () => {
         return false
     }
 
+    const tc = template.content
+
+    list_container.appendChild(tc.querySelector('.add-list').cloneNode(true))
+
     // Process each list and its items from the URL query string
     const params = new URLSearchParams(window.location.search)
-
-    const query_parameters = Array.from(params.keys())
-    const list_names = query_parameters
-        .map((param) => {
-            const list_name_match = param.match(/l(\d+)name/)
-            if (list_name_match === null) return null
-            return {
-                name: params.get(list_name_match[0]) ?? '',
-                number: list_name_match[1] ?? ''
-            }
-        })
-        .filter((list) => list !== null)
+    const list_names = getListNames(params)
 
     list_names.forEach((list_name, list_index) => {
         const list_number = list_name.number
-
-        const tc = template.content
 
         const list_block = tc.querySelector('div.list').cloneNode()
         list_block.setAttribute('id', 'l' + list_number)
@@ -37,10 +28,10 @@ window.addEventListener('load', () => {
 
         const list_ul = tc.querySelector('.list ul').cloneNode()
 
-        list_block.appendChild(tc.querySelector('.list__add-item').cloneNode(true))
-
         const list_items = params.get(`l${list_number}items`)
         if (list_items !== null) {
+            list_block.appendChild(tc.querySelector('.list__add-item').cloneNode(true))
+
             const item_texts = list_items.split(',')
             const items = item_texts.map((item_text, item_index) => {
                 const item_id = `l${list_index}-${item_index}`
@@ -76,17 +67,25 @@ window.addEventListener('load', () => {
                 list_ul.appendChild(item)
             }
             list_block.appendChild(list_ul)
-
-            list_block.appendChild(tc.querySelector('.list__add-item').cloneNode(true))
         } else {
             const no_items_message = document.createElement('p')
             no_items_message.appendChild( document.createTextNode('No items') )
 
             list_block.appendChild(no_items_message)
         }
+
+        list_block.appendChild(tc.querySelector('.list__add-item').cloneNode(true))
     
         const add_item_inputs = list_block.querySelectorAll('.list__add-item input')
         add_item_inputs.forEach(input => input.addEventListener('change', addItem))
+    })
+
+    if (list_names.length > 0) {
+        list_container.appendChild(tc.querySelector('.add-list').cloneNode(true))
+    }
+
+    list_container.querySelectorAll('.add-list input').forEach((input) => {
+        input.addEventListener('change', addList)
     })
 })
 
@@ -97,7 +96,7 @@ function addItem(event) {
     const list_id = list_block.getAttribute('id')
 
     const list_items = params.get(`${list_id}items`)
-    const list_items_array = list_items && list_items.split(',') || []
+    const list_items_array = list_items ? list_items.split(',') : []
     list_items_array.push(input.value)
     params.set(`${list_id}items`, list_items_array)
 
@@ -109,4 +108,41 @@ function addItem(event) {
     // want the URL to remain user-friendly and hackable, so we change it back
     // to commas
     window.location.href = '?' + params.toString().replace(/%2C/g, ',')
+}
+
+function addList(event) {
+    const input = event.target
+    const params = new URLSearchParams(window.location.search)
+
+    const list_names = getListNames(params)
+    console.log(list_names)
+
+    if (list_names.length === 0) {
+        params.set('l1name', input.value)
+    } else {
+        const new_list_number = list_names.reduce((next_number, list_name) => {
+            const number = parseInt(list_name.number)
+            return (number >= next_number) ? number + 1 : next_number
+        }, 0)
+
+        params.set(`l${new_list_number}name`, input.value)
+    }
+
+    // The toString method of URLSearchParams encodes commas to '%2C', but we
+    // want the URL to remain user-friendly and hackable, so we change it back
+    // to commas
+    window.location.href = '?' + params.toString().replace(/%2C/g, ',')
+}
+
+function getListNames(params) {
+    return Array.from(params.keys())
+        .map((param) => {
+            const list_name_match = param.match(/l(\d+)name/)
+            if (list_name_match === null) return null
+            return {
+                name: params.get(list_name_match[0]),
+                number: list_name_match[1],
+            }
+        })
+        .filter((list) => list !== null)
 }

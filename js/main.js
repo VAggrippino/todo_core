@@ -34,7 +34,7 @@ window.addEventListener('load', () => {
 
             const item_texts = list_items.split(',')
             const items = item_texts.map((item_text, item_index) => {
-                const item_id = `l${list_index}-${item_index}`
+                const item_id = `l${list_number}-${item_index}`
 
                 const li = tc.querySelector('.list__item').cloneNode(true)
 

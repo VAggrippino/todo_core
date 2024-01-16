@@ -1,5 +1,5 @@
 window.addEventListener('load', () => {
-    const list_container = (document.querySelector('section.lists'))
+    const lists_container = (document.querySelector('section.lists'))
     const template = document.querySelector('.list-block-template')
 
     if (! template) {
@@ -9,18 +9,18 @@ window.addEventListener('load', () => {
 
     const tc = template.content
 
-    list_container.appendChild(tc.querySelector('.add-list').cloneNode(true))
+    lists_container.appendChild(tc.querySelector('.add-list').cloneNode(true))
 
     // Process each list and its items from the URL query string
     const params = new URLSearchParams(window.location.search)
     const list_names = getListNames(params)
 
-    list_names.forEach((list_name, list_index) => {
+    list_names.forEach((list_name) => {
         const list_number = list_name.number
 
-        const list_block = tc.querySelector('div.list').cloneNode()
+        const list_block = tc.querySelector('.list').cloneNode()
         list_block.setAttribute('id', 'l' + list_number)
-        list_container.appendChild(list_block)
+        lists_container.appendChild(list_block)
 
         const list_heading = tc.querySelector('.list__heading').cloneNode()
         list_heading.innerText = list_name.name
@@ -81,10 +81,10 @@ window.addEventListener('load', () => {
     })
 
     if (list_names.length > 0) {
-        list_container.appendChild(tc.querySelector('.add-list').cloneNode(true))
+        lists_container.appendChild(tc.querySelector('.add-list').cloneNode(true))
     }
 
-    list_container.querySelectorAll('.add-list input').forEach((input) => {
+    lists_container.querySelectorAll('.add-list input').forEach((input) => {
         input.addEventListener('change', addList)
     })
 })
@@ -97,25 +97,54 @@ function addItem(event) {
 
     const list_items = params.get(`${list_id}items`)
     const list_items_array = list_items ? list_items.split(',') : []
+
     list_items_array.push(input.value)
     params.set(`${list_id}items`, list_items_array)
 
     const list_checks = params.get(`${list_id}checks`) ?? ''
-
     params.set(`${list_id}checks`, list_checks + '0')
+
+    const tc = document.querySelector('.list-block-template').content
+    const new_item = tc.querySelector('.list__item').cloneNode(true)
+    const new_item_number = list_items_array.length - 1
+    const new_item_id = `${list_id}-${new_item_number}`
+
+    const new_item_input = new_item.querySelector('input')
+    new_item_input.setAttribute('value', input.value)
+    new_item_input.setAttribute('name', new_item_id)
+    new_item_input.setAttribute('id', new_item_id)
+    new_item_input.removeAttribute('checked')
+
+    const new_item_label = new_item.querySelector('label')
+    new_item_label.setAttribute('for', new_item_id)
+    new_item_label.innerText = input.value
+
+    list_block.querySelector('ul').appendChild(new_item)
 
     // The toString method of URLSearchParams encodes commas to '%2C', but we
     // want the URL to remain user-friendly and hackable, so we change it back
     // to commas
-    window.location.href = '?' + params.toString().replace(/%2C/g, ',')
+    history.replaceState(null, '', '?' + params.toString().replace(/%2C/g, ','))
+
+    input.value = ''
 }
 
 function addList(event) {
     const input = event.target
+    const lists_container = input.closest('.lists')
     const params = new URLSearchParams(window.location.search)
 
     const list_names = getListNames(params)
-    console.log(list_names)
+
+    const tc = document.querySelector('.list-block-template').content
+    const new_list = tc.querySelector('.list').cloneNode()
+    const new_list_heading = tc.querySelector('.list__heading').cloneNode()
+    const new_add_item = tc.querySelector('.list__add-item').cloneNode(true)
+
+    new_list_heading.innerText = input.value
+    new_list.appendChild(new_list_heading)
+    new_list.appendChild(new_add_item)
+    lists_container.appendChild(new_list)
 
     if (list_names.length === 0) {
         params.set('l1name', input.value)
@@ -131,7 +160,9 @@ function addList(event) {
     // The toString method of URLSearchParams encodes commas to '%2C', but we
     // want the URL to remain user-friendly and hackable, so we change it back
     // to commas
-    window.location.href = '?' + params.toString().replace(/%2C/g, ',')
+    history.replaceState(null, '', '?' + params.toString().replace(/%2C/g, ','))
+
+    input.value = ''
 }
 
 function getListNames(params) {

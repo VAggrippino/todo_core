@@ -12,27 +12,35 @@
         <h1>To-Do List - Core</h1>
         <p>
             Use this link to start with a sample list:<br>
-            <a href="?l1name=Shopping+List&l1items=Milk,Fish,Eggs,Cheese,Cereal&l1checks=01101">?l1name=Shopping+List&l1items=Milk,Fish,Eggs,Cheese,Cereal&l1checks=01101</a>
+            <a href="?l1name=Shopping+List&l1type=ul&l1items=Milk,Fish,Eggs,Cheese,Cereal&l1checks=01101&l2name=Captains&l2type=ol&l2items=Kirk,Picard,Sisko,Janeway">?l1name=Shopping+List&l1type=ul&l1items=Milk,Fish,Eggs,Cheese,Cereal&l1checks=01101&l2name=Captains&l2type=ol&l2items=Kirk,Picard,Sisko,Janeway</a>
         </p>
     </header>
     <main>
         <section class="lists"></section>
 
-        <template class="list-block-template">
+        <template class="list-template">
             <div class="add-list">
                 <input type="text" placeholder="New List">
             </div>
-            <div class="list">
+
+            <div class="list__placeholder droppable"></div>
+
+            <div class="list draggable droppable">
                 <h2 class="list__heading">List Template</h2>
+                <!-- TODO: Add a list type selector (ordered / unordered) -->
+
                 <div class="list__add-item">
                     <input type="text" placeholder="Add Item">
                 </div>
-                <ul>
-                    <li class="list__item">
-                        <input type="checkbox" value="Item 1" name="l0-0" id="l0-0" checked>
-                        <label for="l0-0">Item 1</label>
+
+                <ul class="droppable">
+                    <li class="draggable droppable">
+                        <input type="checkbox" value="List 0, Item 1" name="l0-1" id="l0-1">
+                        <label for="l0-1">List 0, Item 1</label>
                     </li>
                 </ul>
+
+                <ol class="droppable"></ol>
             </div>
         </template>
     </main>

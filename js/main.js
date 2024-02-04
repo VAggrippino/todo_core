@@ -123,7 +123,19 @@ function addItem(event) {
     new_item_label.setAttribute('for', new_item_id)
     new_item_label.innerText = input.value
 
-    list_block.querySelector('ul, ol').appendChild(new_item)
+    // Identify an existing list or create a new one
+    const list_list = (function() {
+        const existing_list_list = list_block.querySelector('ul, ol')
+        if (existing_list_list === null) {
+            const new_list_list = tc.querySelector('ul').cloneNode()
+            list_block.appendChild(new_list_list)
+            return new_list_list
+        } else {
+            return existing_list_list
+        }
+    })()
+
+    list_list.appendChild(new_item)
 
     // The toString method of URLSearchParams encodes commas to '%2C', but we
     // want the URL to remain user-friendly and hackable, so we change it back
@@ -147,6 +159,8 @@ function addList(event) {
 
     new_list_heading.innerText = input.value
     new_list.appendChild(new_list_heading)
+
+    new_add_item.addEventListener('change', addItem)
 
     // TODO: Add a list type selector (ordered / unordered)
 

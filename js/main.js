@@ -203,6 +203,8 @@ function addList(event) {
     history.replaceState(null, '', '?' + params.toString().replace(/%2C/g, ','))
 
     input.value = ''
+
+    location.replace('#' + list_id)
 }
 
 function getLists(params) {

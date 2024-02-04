@@ -129,6 +129,15 @@ function addItem(event) {
         if (existing_list_list === null) {
             const new_list_list = tc.querySelector('ul').cloneNode()
             list_block.appendChild(new_list_list)
+
+            // Add the list type to the query parameters
+            params.set(`${list_id}type`, 'ul')
+
+            /* Empty list blocks have one _Add Item_ input, but list blocks with
+             * items have _Add Item_ fields before and after the list of items.
+            */
+            list_block.appendChild(tc.querySelector('.list__add-item').cloneNode(true))
+
             return new_list_list
         } else {
             return existing_list_list
@@ -148,35 +157,45 @@ function addItem(event) {
 function addList(event) {
     const input = event.target
     const lists_container = input.closest('.lists')
-    const params = new URLSearchParams(window.location.search)
-
-    const list_names = getLists(params)
 
     const tc = document.querySelector('.list-template').content
     const new_list = tc.querySelector('.list').cloneNode()
-    const new_list_heading = tc.querySelector('.list__heading').cloneNode()
-    const new_add_item = tc.querySelector('.list__add-item').cloneNode(true)
 
-    new_list_heading.innerText = input.value
-    new_list.appendChild(new_list_heading)
+    /* Iterate over existing list ids and incrementing the greatest of them by 1.
+     * This accommodates missing list id numbers as well as disordered list id numbers.
+     */
+    const lists = Array.from(lists_container.querySelectorAll('.list'))
+    const list_id_number = lists.reduce((id_number, current_list) => {
+        const current_id = current_list.getAttribute('id')
+        const current_id_value = +current_id.substring(1)
 
-    new_add_item.addEventListener('change', addItem)
+        if (current_id_value >= id_number) {
+            return current_id_value + 1
+        } else {
+            return id
+        }
+    }, 1)
+
+    const list_id = 'l' + list_id_number
+    new_list.setAttribute('id', list_id)
+
+    const list_heading = tc.querySelector('.list__heading').cloneNode()
+    list_heading.appendChild(document.createTextNode(input.value))
+    new_list.appendChild(list_heading)
 
     // TODO: Add a list type selector (ordered / unordered)
 
-    new_list.appendChild(new_add_item)
-    lists_container.appendChild(new_list)
+    const add_item = tc.querySelector('.list__add-item').cloneNode(true)
+    add_item.addEventListener('change', addItem)
+    new_list.appendChild(add_item)
 
-    if (list_names.length === 0) {
-        params.set('l1name', input.value)
-    } else {
-        const new_list_number = list_names.reduce((next_number, list_name) => {
-            const number = parseInt(list_name.number)
-            return (number >= next_number) ? number + 1 : next_number
-        }, 0)
+    // Insert the new list before the last _Add List_ block
+    const add_list_blocks = Array.from(lists_container.querySelectorAll('.add-list'))
+    const last_add_list_block = add_list_blocks.toReversed()[0]
+    lists_container.insertBefore(new_list, last_add_list_block)
 
-        params.set(`l${new_list_number}name`, input.value)
-    }
+    const params = new URLSearchParams(window.location.search)
+    params.set(list_id + 'name', input.value)
 
     // The toString method of URLSearchParams encodes commas to '%2C', but we
     // want the URL to remain user-friendly and hackable, so we change it back

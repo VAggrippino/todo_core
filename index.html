@@ -28,7 +28,13 @@
 
             <div class="list draggable droppable">
                 <h2 class="list__heading">List Template</h2>
-                <!-- TODO: Add a list type selector (ordered / unordered) -->
+
+                <div class="list__type">
+                    <input type="radio" name="l0type" id="l0type-ul" value="ul" checked>
+                    <label for="l0type-ul">&bull;</label>
+                    <input type="radio" name="l0type" id="l0type-ol" value="ol">
+                    <label for="l0type-ol">1.</label>
+                </div>
 
                 <div class="list__add-item">
                     <input type="text" placeholder="Add Item">

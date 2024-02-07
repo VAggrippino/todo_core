@@ -1,7 +1,5 @@
-window.addEventListener('load', () => {
+window.addEventListener('DOMContentLoaded', () => {
     const lists_container = (document.querySelector('section.lists'))
-    const template = document.querySelector('.list-template')
-    const tc = template.content
 
     // Process each list and its items from the URL query string
     const lists = getLists()
@@ -47,7 +45,9 @@ function addItems({values, checks, list_block}) {
 
         if (existing_list_list !== null) return existing_list_list
 
-        const list_list = tc.querySelector('ul').cloneNode()
+        const type = params.get(list_id + 'type')
+
+        const list_list = tc.querySelector(type).cloneNode()
         list_block.appendChild(list_list)
 
         addNewItemField(list_block)
@@ -129,6 +129,7 @@ function addItemHandler(event) {
 }
 
 function addList({container, heading}) {
+    const params = new URLSearchParams(window.location.search)
     const tc = document.querySelector('.list-template').content
     const list_block = tc.querySelector('.list').cloneNode()
 
@@ -159,6 +160,37 @@ function addList({container, heading}) {
     list_heading.appendChild(document.createTextNode(heading))
     list_block.appendChild(list_heading)
 
+    // Use the defined list type or set a default of 'ul'
+    const type = (function() {
+        const param_type = params.get(list_id + 'type')
+        if (param_type === null) {
+            params.set(list_id, 'ul')
+            return 'ul'
+        }
+        return param_type
+    })()
+
+    const list_type_block = tc.querySelector('.list__type').cloneNode(true)
+    list_type_block.childNodes.forEach((node) => {
+        if (node.tagName === 'INPUT') {
+            node_id = node.getAttribute('id')
+            node.setAttribute('id', list_id + node_id.slice(2))
+
+            node_name = node.getAttribute('name')
+            node.setAttribute('name', list_id + node_name.slice(2))
+
+            node.removeAttribute('checked')
+            if (node.value === type) node.setAttribute('checked', 'checked')
+
+            node.addEventListener('change', setListTypeHandler)
+        } else if (node.tagName === 'LABEL') {
+            node_for = node.getAttribute('for')
+            node.setAttribute('for', list_id + node_for.slice(2))
+        }
+    })
+
+    list_block.appendChild(list_type_block)
+
     // Add the new list block after the last list block or, if this is the first
     // list, after _New List_ field.
     if (lists.length > 0) {
@@ -179,13 +211,11 @@ function addList({container, heading}) {
     // Add a "No items." message for the new list.
     addNoItemsMessage(list_block)
 
-    // TODO: Add a list type selector (ordered / unordered)
-
     // Add an _Add Item_ field for the new list.
     const new_item_field = addNewItemField(list_block)
 
-    const params = new URLSearchParams(window.location.search)
     params.set(list_id + 'name', heading)
+    params.set(list_id + 'type', 'ul')
 
     setUrl(params)
     return list_block
@@ -198,7 +228,6 @@ function addListHandler(event) {
     const list_block = addList({container, heading})
     input.value = ''
 
-    // TODO: Add `scroll-behavior: smooth` to CSS for this:
     list_block.scrollIntoView({behavior: 'smooth'})
     /* Focus the empty list's _Add Item_ field after the UI has had a chance to
      * smoothly scroll into view.
@@ -289,4 +318,30 @@ function addNoItemsMessage(list_block) {
     no_items.classList.add('no-items')
     no_items.appendChild( document.createTextNode('No items.') )
     list_block.appendChild(no_items)
+}
+
+function setListTypeHandler(event) {
+    // Identify the list and selected type.
+    const target = event.target
+    const name = target.getAttribute('name') // l<number>type
+    const type  = target.value
+
+    // Identify the old list and its items.
+    const list_block = target.closest('.list')
+    const old_list_list = list_block.querySelector('ul, ol')
+    const list_items = old_list_list.querySelectorAll('li')
+    
+    // Move the items to a new list of the selected type.
+    const tc = document.querySelector('.list-template').content
+    const list_list = tc.querySelector(type).cloneNode()
+    list_block.insertBefore(list_list, old_list_list)
+    list_items.forEach(item => list_list.appendChild(item))
+
+    // Remove the old list.
+    old_list_list.remove()
+
+    // Set the change in the query string.
+    const params = new URLSearchParams(window.location.search)
+    params.set(name, type)
+    setUrl(params)
 }

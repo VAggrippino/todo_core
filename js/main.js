@@ -1,42 +1,85 @@
 window.addEventListener('DOMContentLoaded', () => {
-    const lists_container = (document.querySelector('section.lists'))
+    const lists_container = document.querySelector('section.lists')
 
     // Process each list and its items from the URL query string
     const lists = getLists()
 
+    // If there weren't any lists, add a "No lists" message.
     if (lists.length === 0) {
         const no_lists = document.createElement('p')
         no_lists.classList.add('no-lists')
-        no_lists.appendChild(document.createTextNode('No lists.'))
-        lists_container.appendChild(no_lists)
+        no_lists.append('No lists.')
+        lists_container.append(no_lists)
     }
 
-    // An initial _New List_ field should be after a "No lists" message, but
-    // before any lists
-    const add_new_list_block = addNewListField(lists_container)
+    // This initial _New List_ field will be after the "No lists" message
+    // (above) or before the lists (below).
+    addNewListField(lists_container)
 
     // Build each list from the query parameters' data
     lists.forEach((list) => {
-        const list_block = addList({
-            container: lists_container,
-            heading: list.name,
-        })
+        const list_block = addList(list)
 
         if (list.items !== null) {
-            addItems({
-                values: list.items,
-                checks: list.checks ?? '',
-                list_block
-            })
+           addItems(list)
         } else {
             addNoItemsMessage(list_block)
         }
     })
+
+    // Add a placeholder for drag and drop operations after all the list blocks.
+    if (lists.length > 0) {
+        const last_list = document.querySelector(':nth-last-child(1 of .lists .list)')
+        addPlaceholder(last_list)
+    }
+
+    // Prevent inputs from being drop targets.
+    document.querySelectorAll('input').forEach((input) => {
+        input.addEventListener('dragover',  e => e.dataTransfer.dropEffect = 'none')
+    })
+
+    // Set the `draggable` property and event handlers on elements with the
+    // `draggable` CSS class.
+    const draggables = document.querySelectorAll('.draggable')
+    draggables.forEach((item) => {
+        // If the item doesn't already have an id, generate one.
+        {
+            const id = item.getAttribute('id')
+            const generated_id = item.tagName + '-' + Math.random() * 10000
+            if (id === null) item.setAttribute('id', generated_id)
+        }
+
+        item.setAttribute('draggable', 'true')
+
+        item.addEventListener('dragstart', (event) => {
+            // Prevent `dragstart` from being triggered on ancestors.
+            event.stopPropagation()
+            event.dataTransfer.effectAllowed = 'move'
+            event.dataTransfer.setData('text/plain', item.getAttribute('id'))
+        })
+
+        item.addEventListener('dragend', (event) => {
+            event.stopPropagation()
+            const inserts = document.querySelectorAll('.insert-before, .insert-after, .targeted')
+            inserts.forEach((item) => {
+                item.classList.remove('insert-before', 'insert-after', 'targeted')
+            })
+        })
+    })
+
+    // Add event handlers for drop targets to elements with the `droppable` CSS class
+    const droppables = document.querySelectorAll('.lists .droppable')
+    droppables.forEach((item) => {
+        item.addEventListener('dragover', e => e.preventDefault())
+        item.addEventListener('dragenter', dragenterHandler)
+        item.addEventListener('drop', dropHandler)
+    })
 })
 
-function addItems({values, checks, list_block}) {
-    const params = new URLSearchParams(window.location.search)
-    const list_id = list_block.getAttribute('id')
+function addItems(list) {
+    // const list_id = list_block.getAttribute('id')
+    const list_id = 'l' + list.number
+    const list_block = document.getElementById(list_id)
     const tc = document.querySelector('.list-template').content
 
     // Use an existing list or create a new one
@@ -45,10 +88,8 @@ function addItems({values, checks, list_block}) {
 
         if (existing_list_list !== null) return existing_list_list
 
-        const type = params.get(list_id + 'type')
-
-        const list_list = tc.querySelector(type).cloneNode()
-        list_block.appendChild(list_list)
+        const list_list = tc.querySelector(list.type ?? 'ul').cloneNode()
+        list_block.append(list_list)
 
         addNewItemField(list_block)
 
@@ -57,15 +98,15 @@ function addItems({values, checks, list_block}) {
 
     const items = Array.from(list_list.querySelectorAll('li'))
 
-    // If the list didn't have any items yet, add the "No items." message.
+    // If the list didn't have any items yet, remove the "No items." message.
     if (items.length === 0) {
         list_block.querySelector('.no-items').remove()
     }
 
     // Add the items
-    values.split(',').forEach((value, index) => {
-        const decoded_value = decodeURIComponent(value)
+    list.items.split(',').forEach((value, index) => {
         // Create the new item.
+        const decoded_value = decodeURIComponent(value)
         const item = tc.querySelector('li').cloneNode(true)
         const item_id_number = items.length + index + 1
         const item_id = list_id + '-' + item_id_number
@@ -76,7 +117,7 @@ function addItems({values, checks, list_block}) {
         checkbox.setAttribute('name', item_id)
         checkbox.setAttribute('id', item_id)
 
-        const check = checks.substring(index, index + 1)
+        const check = list.checks.slice(index, index + 1)
 
         if (check === '1') {
             checkbox.setAttribute('checked', 'checked')
@@ -84,19 +125,18 @@ function addItems({values, checks, list_block}) {
             checkbox.removeAttribute('checked')
         }
 
-        //checkbox.removeAttribute('checked')
         checkbox.addEventListener('change', updateCheck)
 
         // Set up the label.
         /* Since we _deep_ cloned the template list item, we replace the
-         * `innerText` rather than just appending `document.createTextNode`.
+         * `innerText` rather than just appending text.
          */
         const label = item.querySelector('label')
         label.setAttribute('for', item_id)
         label.innerText = decoded_value
 
         // Add the new item to the page.
-        list_list.appendChild(item)
+        list_list.append(item)
 
         // Add the new item to the list of items.
         items.push(item)
@@ -114,6 +154,7 @@ function addItems({values, checks, list_block}) {
         param.checks.push(checkbox.checked ? '1' : '0')
     })
 
+    const params = new URLSearchParams(window.location.search)
     params.set(list_id + 'items', param.items.join(','))
     params.set(list_id + 'checks', param.checks.join(''))
 
@@ -121,57 +162,61 @@ function addItems({values, checks, list_block}) {
 }
 
 function addItemHandler(event) {
-    const values = encodeURIComponent(event.target.value)
     const checks = ''
     const list_block = event.target.closest('.list')
-    addItems({values, checks, list_block})
+    const list = {
+        number: list_block.getAttribute('id').slice(1),
+        items: encodeURIComponent(event.target.value),
+        checks: checks,
+    }
+
+    addItems(list)
     event.target.value = ''
 }
 
-function addList({container, heading}) {
-    const params = new URLSearchParams(window.location.search)
+function addList(list) {
     const tc = document.querySelector('.list-template').content
     const list_block = tc.querySelector('.list').cloneNode()
 
+    const container = document.querySelector('.lists')
+
     const lists = Array.from(container.querySelectorAll('.list'))
     const add_list_blocks = container.querySelectorAll('.add-list')
+    
+    // If there's a "No Lists" message, remove it.
     const no_lists_message = container.querySelector('.no-lists') ?? null
+    if (no_lists_message !== null) no_lists_message.remove()
 
-    /* Generate a new list id number by incrementing the highest existing list
-     * id number by 1.
-     * This accommodates missing list id numbers as well as disordered list id
-     * numbers.
-     */
-    const id_number = lists.reduce((id_number, list) => {
-        const current_id = list.getAttribute('id')
-        const current_id_number = +current_id.substring(1)
+    // Use the existing list ID number, if provided, or generate a new one.
+    const id_number = (function() {
+        if (typeof list.number !== 'undefined') return list.number
+        const new_id = lists.reduce((id_number, list) => {
+            const current_id = list.getAttribute('id')
+            const current_id_number = +current_id.slice(1)
+            if (current_id_number >= id_number) {
+                return current_id_number + 1
+            } else {
+                return id_number
+            }
+        }, 1)
+        return new_id
+    })()
 
-        if (current_id_number >= id_number) {
-            return current_id_number + 1
-        } else {
-            return id_number
-        }
-    }, 1)
-
+    // Set the HTML id attribute for the new list block.
     const list_id = 'l' + id_number
     list_block.setAttribute('id', list_id)
 
-    const list_heading = tc.querySelector('.list__heading').cloneNode()
-    list_heading.appendChild(document.createTextNode(heading))
-    list_block.appendChild(list_heading)
+    // Create the list heading.
+    const heading = tc.querySelector('.list__heading').cloneNode()
+    heading.append(list.name)
+    list_block.append(heading)
 
-    // Use the defined list type or set a default of 'ul'
-    const type = (function() {
-        const param_type = params.get(list_id + 'type')
-        if (param_type === null) {
-            params.set(list_id, 'ul')
-            return 'ul'
-        }
-        return param_type
-    })()
+    // Use the defined list type or set it to 'ul' if it's not already set.
+    const type = list.type ?? 'ul'
 
-    const list_type_block = tc.querySelector('.list__type').cloneNode(true)
-    list_type_block.childNodes.forEach((node) => {
+    // Add a list type selector.
+    const type_selector = tc.querySelector('.list__type').cloneNode(true)
+    type_selector.childNodes.forEach((node) => {
         if (node.tagName === 'INPUT') {
             node_id = node.getAttribute('id')
             node.setAttribute('id', list_id + node_id.slice(2))
@@ -188,44 +233,52 @@ function addList({container, heading}) {
             node.setAttribute('for', list_id + node_for.slice(2))
         }
     })
+    list_block.append(type_selector)
 
-    list_block.appendChild(list_type_block)
+    // Add a droppable placeholder after the last list or after the first
+    // _add list_ field if this is the first list.
+    const placeholder = (function() {
+        if (lists.length > 0) {
+            return addPlaceholder(lists.toReversed()[0])
+        } else {
+            return addPlaceholder(add_list_blocks[0])
+        }
+    })()
 
-    // Add the new list block after the last list block or, if this is the first
-    // list, after _New List_ field.
-    if (lists.length > 0) {
-        lists.toReversed()[0].insertAdjacentElement('afterend', list_block)
-    } else if (add_list_blocks.length > 0) {
-        add_list_blocks[0].insertAdjacentElement('afterend', list_block)
-    } else {
-        container.appendChild(list_block)
-    }
+    // Add the new list block after the placeholder
+    placeholder.insertAdjacentElement('afterend', list_block)
 
-    // If this was the first list, add a _New List_ field at the end.
+    // If this was the first list, add a _New List_ field after it.
     if (lists.length === 0) {
         addNewListField(container)
     }
-
-    if (no_lists_message !== null) no_lists_message.remove()
 
     // Add a "No items." message for the new list.
     addNoItemsMessage(list_block)
 
     // Add an _Add Item_ field for the new list.
-    const new_item_field = addNewItemField(list_block)
+    addNewItemField(list_block)
 
-    params.set(list_id + 'name', heading)
-    params.set(list_id + 'type', 'ul')
+    // If the list number wasn't previously set, it's a new list. So, we need to
+    // add query parameters for it and set properties on the list object.
+    if (typeof list.number === 'undefined') {
+        const params = new URLSearchParams(window.location.search)
+        params.set(list_id + 'name', list.name)
+        params.set(list_id + 'type', type)
 
-    setUrl(params)
+        setUrl(params)
+
+        list.number = id_number
+        list.type = type
+    }
+
     return list_block
 }
 
 function addListHandler(event) {
     const input = event.target
-    const container = input.closest('.lists')
     const heading = input.value
-    const list_block = addList({container, heading})
+    const list_block = addList({name: heading})
     input.value = ''
 
     list_block.scrollIntoView({behavior: 'smooth'})
@@ -242,23 +295,27 @@ function addListHandler(event) {
 
 function getLists() {
     const params = new URLSearchParams(window.location.search)
-    return Array.from(params.keys())
+    const lists = Array.from(params.keys())
         .map((param) => {
             const list_name_match = param.match(/l(\d+)name/)
 
+            // If this key isn't a list name, return null.
+            // Nulls are filtered out next.
             if (list_name_match === null) return null
 
             const number = list_name_match[1]
 
-            return {
+            const list = {
                 name: params.get(list_name_match[0]),
                 number: number,
                 type: params.get(`l${number}type`),
                 items: params.get(`l${number}items`),
                 checks: params.get(`l${number}checks`),
             }
+            return list
         })
         .filter((list) => list !== null)
+    return lists
 }
 
 function updateCheck(event) {
@@ -301,7 +358,7 @@ function addNewItemField(list_block) {
     const tc = document.querySelector('.list-template').content
     const add_item = tc.querySelector('.list__add-item').cloneNode(true)
     add_item.addEventListener('change', addItemHandler)
-    list_block.appendChild(add_item)
+    list_block.append(add_item)
     return add_item
 }
 
@@ -309,22 +366,22 @@ function addNewListField(lists_container) {
     const tc = document.querySelector('.list-template').content
     const add_list = tc.querySelector('.add-list').cloneNode(true)
     add_list.addEventListener('change', addListHandler)
-    lists_container.appendChild(add_list)
+    lists_container.append(add_list)
     return add_list
 }
 
 function addNoItemsMessage(list_block) {
     const no_items = document.createElement('p')
     no_items.classList.add('no-items')
-    no_items.appendChild( document.createTextNode('No items.') )
-    list_block.appendChild(no_items)
+    no_items.append('No items.')
+    list_block.append(no_items)
 }
 
 function setListTypeHandler(event) {
     // Identify the list and selected type.
     const target = event.target
     const name = target.getAttribute('name') // l<number>type
-    const type  = target.value
+    const type = target.value
 
     // Identify the old list and its items.
     const list_block = target.closest('.list')
@@ -335,7 +392,7 @@ function setListTypeHandler(event) {
     const tc = document.querySelector('.list-template').content
     const list_list = tc.querySelector(type).cloneNode()
     list_block.insertBefore(list_list, old_list_list)
-    list_items.forEach(item => list_list.appendChild(item))
+    list_items.forEach(item => list_list.append(item))
 
     // Remove the old list.
     old_list_list.remove()
@@ -343,5 +400,236 @@ function setListTypeHandler(event) {
     // Set the change in the query string.
     const params = new URLSearchParams(window.location.search)
     params.set(name, type)
+    setUrl(params)
+}
+
+function addPlaceholder(target) {
+    const tc = document.querySelector('.list-template').content
+    const placeholder = tc.querySelector('.list__placeholder').cloneNode()
+    target.insertAdjacentElement('afterend', placeholder)
+    return placeholder
+}
+
+function dragenterHandler(event) {
+    // Prevent `dragenter` from being triggered on ancestors.
+    event.stopPropagation()
+
+    const dt = event.dataTransfer
+    const dragged_id = dt.getData('text/plain')
+    const dragged = document.getElementById(dragged_id)
+    const droptarget = event.target.closest('.droppable')
+
+    // Don't do anything if the element is dragged over itself or the element
+    // after it.
+    if (dragged === droptarget) return
+    if (droptarget === dragged.nextElementSibling) return
+
+    // Remove classes that were added during `dragenter` events for other drop
+    // targets.
+    const inserts = document.querySelectorAll('.insert-before, .insert-after, .targeted')
+    inserts.forEach((item) => {
+        item.classList.remove('insert-before', 'insert-after', 'targeted')
+    })
+
+    // Convenience booleans:
+    const dragged_is_list_block = dragged.classList.contains('list')
+    const dragged_is_list_item = dragged.tagName === 'LI'
+
+    const droptarget_is_placeholder = droptarget.classList.contains('list__placeholder')
+    const droptarget_is_list_block = droptarget.classList.contains('list')
+    const droptarget_is_list = droptarget.tagName === 'OL' || droptarget.tagName === 'UL'
+    const droptarget_is_list_item = droptarget.tagName === 'LI'
+
+    if (dragged_is_list_block) {
+        const next_list = document.querySelector(`#${dragged_id} ~ .list`)
+
+        // Don't do anything if a list block is dragged over an adjacent element.
+        if (droptarget === dragged.previousElementSibling) return
+        if (droptarget === dragged.nextElementSibling) return
+
+        // Don't do anything if the drop target is the next list block.
+        if (droptarget_is_list_block) {
+            if (droptarget === next_list) return
+        }
+
+        // Don't do anything if the drop target is inside the dragged list box
+        // or the next list box.
+        if (droptarget_is_list || droptarget_is_list_item) {
+            const ancestor = droptarget.closest('.list')
+            if (ancestor === dragged || ancestor === next_list) return
+        }
+
+        // Identify the target placeholder and add the CSS class that shows
+        // where we're moving the list block.
+        const target_placeholder = (function() {
+            if (droptarget_is_placeholder) return droptarget
+            if (droptarget_is_list_block) return droptarget.previousElementSibling
+
+            // The droptarget is a list or list item
+            return droptarget.closest('.list').previousElementSibling
+        })()
+        target_placeholder.classList.add('targeted')
+    }
+
+    if (dragged_is_list_item) {
+        // Don't do anything if we drag a list item over itself or the item after it.
+        if ([dragged, dragged.nextElementSibling].includes(droptarget)) return
+
+        if (droptarget_is_list_item) {
+            droptarget.classList.add('insert-before')
+        } else {
+            const insert_target = (function() {
+                // If the drop target is a placeholder, the insert target is the
+                // list in the following list block, or the list block itself if
+                // it doesn't contain a list.
+                if (droptarget_is_placeholder) {
+                    const list_block = droptarget.nextElementSibling
+                    return list_block.querySelector('ul, ol') || list_block
+                }
+
+                // If the drop target is a list block, the insert target is the
+                // list it contains, or the list block itself if it doesn't
+                // contain a list.
+                if (droptarget_is_list_block) {
+                    return droptarget.querySelector('ul, ol') || droptarget
+                }
+
+                // If we get here, the insert target is the drop target, which is a list.
+                return droptarget
+            })()
+
+            insert_target.classList.add('insert-after')
+        }
+    }
+}
+
+function dropHandler(event) {
+    event.stopPropagation()
+
+    const dragged_id = event.dataTransfer.getData('text/plain')
+    const dragged = document.getElementById(dragged_id)
+    const droptarget = event.target.closest('.droppable')
+
+    const dragged_tag = dragged.tagName
+    const droptarget_tag = droptarget.tagName
+
+    const origin_list_block = dragged.closest('.list')
+
+    // Convenience booleans:
+    const dragged_is_list_block = dragged.classList.contains('list')
+    const dragged_is_list_item = dragged_tag === 'LI'
+
+    const droptarget_is_placeholder = droptarget.classList.contains('list__placeholder')
+    const droptarget_is_list_block = droptarget.classList.contains('list')
+    const droptarget_is_list = droptarget_tag === 'UL' || droptarget_tag === 'OL'
+    const droptarget_is_list_item = droptarget_tag === 'LI'
+
+    if (dragged_is_list_block) {
+        const before = dragged.previousElementSibling
+        const after = dragged.nextElementSibling
+
+        const target = (function() {
+            if (droptarget_is_placeholder) return droptarget
+            if (droptarget_is_list_block) return droptarget.previousElementSibling
+
+            // If we get here, the droptarget is either a list(ul/ol) or a list item(li).
+            return droptarget.closest('.list').previousElementSibling
+        })()
+
+        // Don't do anything if the target placeholder is adjacent to the
+        // dragged list block.
+        if ([before, after].includes(target)) return
+
+        // Move the dragged list block and its preceding placeholder before the
+        // target placeholder.
+        target.insertAdjacentElement('beforebegin', before)
+        target.insertAdjacentElement('beforebegin', dragged)
+    }
+
+    if (dragged_is_list_item) {
+        // Don't do anything if we dropped the list item over itself or the item
+        // after it.
+        if ([droptarget, dragged.nextElementSibling].includes(dragged)) return
+
+        // If we drop the list item on a placeholder, move it to the end of the
+        // following list.
+        if (droptarget_is_placeholder) {
+            const target_list = droptarget.nextElementSibling.querySelector('ul, ol')
+            target_list.append(dragged)
+        }
+
+        // If we drop the list item on a list block, move it to the end of the
+        // list inside or create a new list if the droptarget is an empty list
+        // block.
+        if (droptarget_is_list_block) {
+            const target_list = (function() {
+                const origin_list_type = dragged.closest('ul, ol').tagName.toLowerCase()
+                const existing_list = droptarget.querySelector('ul, ol')
+
+                if (existing_list === null) {
+                    const tc = document.querySelector('.list-template').content
+                    const new_list = tc.querySelector(list_type).cloneNode()
+                    droptarget.append(new_list)
+                    return new_list
+                }
+
+                return existing_list
+            })()
+
+            target_list.append(dragged)
+
+            // Remove the origin list if it's empty now.
+            if (origin_list_block.querySelectorAll('li').length === 0) origin_list_block.remove()
+        }
+
+        // If we drop the list item on another list item, insert it before the
+        // target.
+        if (droptarget_is_list_item) {
+            droptarget.insertAdjacentElement('beforebegin', dragged)
+        }
+
+        // If we drop the list item over a list (ul/ol), move it to the end of
+        // the list.
+        if (droptarget_is_list) {
+            droptarget.append(dragged)
+        }
+    }
+
+    // Redefine element IDs for the modified lists
+    const target_list_block = droptarget.closest('.list')
+
+    for (const list_block of [origin_list_block, target_list_block]) {
+        list_id = list_block.getAttribute('id')
+        list_block.querySelectorAll('li').forEach((item, index) => {
+            const new_id = `${list_id}-${index + 1}`
+            const checkbox = item.querySelector('input[type=checkbox')
+            const label = item.querySelector('label')
+            checkbox.setAttribute('id', new_id)
+            label.setAttribute('for', new_id)
+        })
+        updateUrlListItems(list_block)
+    }
+}
+
+function updateUrlListItems(list_block) {
+    const list_id = list_block.getAttribute('id')
+    const param = {
+        items: [],
+        checks: [],
+    }
+
+    // Get the current items and the checked status of each item from the document
+    const items = list_block.querySelectorAll('li')
+    items.forEach((item) => {
+        const checkbox = item.querySelector('input[type=checkbox')
+        param.items.push(checkbox.value)
+        param.checks.push(checkbox.checked ? '1' : '0')
+    })
+
+    // Update the URL params with the current information
+    const params = new URLSearchParams(window.location.search)
+    params.set(list_id + 'items', param.items.join(','))
+    params.set(list_id + 'checks', param.checks.join(''))
+
     setUrl(params)
 }
